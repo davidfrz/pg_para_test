@@ -25,7 +25,7 @@ extern	jmp_buf	pr_jmpbuf;
 #include "access/xlogdefs.h"
 #include "access/xlogreader.h"
 #include "access/xlogrecord.h"
-
+#include "common/tlsf.h"
 /*
  * Parallel replay configuration to be taken from GUC
  */
@@ -100,7 +100,7 @@ struct PR_shm
 	PR_XLogHistory	*history;
 	PR_queue	*queue;
 	PR_buffer	*buffer;
-	slock_t		shm_slock;			/* Spin lock for EndRecPtrand MinTimeLineID */
+	slock_t		shm_slock;			/* Spin lock for EndRecPtr and MinTimeLineID */
 	slock_t		sync_lock;		/* Spin lock for PR_recvSync(). Protects worker->worker_waiting */
 	pid_t		reader_pid;		/* Reader worker PID */
 	bool		some_failed;	/* Indicates if some worker failed and exited. */
@@ -122,7 +122,7 @@ struct PR_invalidPages
  *
  * This is ring-shaped link of the element.
  * If all the elements from head to some point is replayed,
- * this is reflected to XCloCtl.
+ * this is reflected to XClogCtl.
  *
  */
 struct PR_XLogHistory
@@ -177,7 +177,7 @@ typedef struct PR_worker
 	bool		 worker_terminated;	/* Indicates the workerr has successfully terminated. */
 	XLogRecPtr	 assignedRecPtr;	/* Latest assigned XLOG record ptr. */
 								/* Set by enqueue side worker. */
-	XLogRecPtr	 handledRecPtr;	/* Last andled XLOG record ptr by this worker. */
+	XLogRecPtr	 handledRecPtr;	/* Last handled XLOG record ptr by this worker. */
 								/* Set by fetchqueue side worker */
 	int			 num_queued_el;	/* Number of queue element in the que */
 	PR_queue_el	*head;			/* Dispatched queue head.   Pick queue element from here. */
@@ -429,8 +429,9 @@ struct PR_buffer
 	uint64		 curr_sno;			/* Serial No. for the chunk */
 	void		*head;				/* Start of the area: Initialized and then static */
 	void		*tail;				/* Next of the end of the area: Initialized and then static */
-	void		*alloc_start;		/* Can allocate from here. */
-	void		*alloc_end;			/* Can allocate up to here. */
+	// void		*alloc_start;		/* Can allocate from here. */
+	// void		*alloc_end;			/* Can allocate up to here. */
+	tlsf_t 	    tlsf;				/* tlsf memory pool*/
 	Size		*needed_by_worker;	/* Size of the buffer needed by each worker */
 	void	   **allocated_buffer;	/* Allocated buffer for each worker, in response to needed_by_worker flag */
 };
@@ -470,6 +471,7 @@ struct PR_BufChunk
 #ifdef WAL_DEBUG
 extern void PRDebug_init(bool force_init);
 extern void PRDebug_start(int worker_idx);
+extern void PRDebug2_start(int worker_idx);
 extern void PRDebug_attach(void);
 extern void PRDebug_sync(void);
 extern void PRDebug_log(char *fmt, ...) __attribute__ ((format (printf, 1, 2)));

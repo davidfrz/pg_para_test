@@ -5496,7 +5496,8 @@ StartChildProcess(AuxProcType type, int idx)
 		if (PR_needTestSync() && type == ParallelRedoProcess)
 		{
 			elog(DEBUG3, "%s: %s: Starting parallel replay debug. Pid = %d.", __func__, __FILE__, getpid());
-			PRDebug_start(idx);
+			// if (idx >= 4)
+				// PRDebug_start(idx);
 		}
 #endif
 		InitPostmasterChild();

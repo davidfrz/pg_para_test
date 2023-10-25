@@ -239,7 +239,7 @@ static void initXLogHistory(void);
 
 #define	lock_xlog_history()		SpinLockAcquire(&pr_history->slock)
 #define	unlock_xlog_history()	SpinLockRelease(&pr_history->slock)
-#define num_history_element		(num_preplay_worker_queue + 2)
+#define num_history_element		(num_preplay_worker_queue + 2000)
 
 /*
  ***********************************************************************************************
@@ -1485,7 +1485,7 @@ updateTxnInfoAfterReplay(TransactionId xid, XLogRecPtr lsn, bool need_lock)
 	txn_cell = find_txn_cell(xid, false, need_lock, &created);
 	if (txn_cell == NULL)
 	{
-		elog(LOG, "No transaction info found while replaying.");
+		elog(DEBUG1, "No transaction info found while replaying.");
 		return;
 	}
 #ifdef WAL_DEBUG
@@ -2293,8 +2293,12 @@ PR_initMq(void)
 		snprintf(queue_info[ii].queue_name, QUEUENAMLEN, "/pg_%d_%03d", pr_reader_pid, ii);
 		mq_unlink(queue_info[ii].queue_name);
 		queue_info[ii].queue = mq_open(queue_info[ii].queue_name, O_CREAT | O_RDWR, 0600, &queue_attr);
-		if (queue_info[ii].queue < 0)
+		if (queue_info[ii].queue < 0) {
+			int myerrnumber = errno;
+			elog(LOG, "errno is %ld", myerrnumber);
 			elog(PANIC, "Mq_open() error.\n");
+
+		}
 		queue_info[ii].opened = true;
 	}
 }
@@ -2467,7 +2471,6 @@ PR_dump_fetchQueue(const char *funcname, PR_queue_el *el)
 void
 PR_enqueue(void *data, PR_QueueDataType type, int	worker_idx)
 {
-	ereport(LOG,(errmsg("eeee queue start")));
 	PR_queue_el	*el;
 	PR_worker	*target_worker;
 	XLogRecPtr	 currRecPtr;
@@ -2523,7 +2526,6 @@ PR_enqueue(void *data, PR_QueueDataType type, int	worker_idx)
 	}
 	if (type == RequestSync)
 		PR_recvSync();
-	ereport(LOG,(errmsg("eeee queue done")));
 	return;
 }
 
@@ -2912,116 +2914,116 @@ next_chunk(PR_BufChunk *chunk)
 void
 PR_dump_buffer(const char *funcname, bool need_lock)
 {
-	static StringInfo	s = NULL;
+// 	static StringInfo	s = NULL;
 
-#if 1
-	return;
-#endif
+// #if 1
+// 	return;
+// #endif
 
-	if (s == NULL)
-		s = makeStringInfo();
-	else
-		resetStringInfo(s);
+// 	if (s == NULL)
+// 		s = makeStringInfo();
+// 	else
+// 		resetStringInfo(s);
 
-	dump_buffer(funcname, s, need_lock);
-	PRDebug_out(s);
+// 	dump_buffer(funcname, s, need_lock);
+// 	PRDebug_out(s);
 }
 
 static bool
 dump_buffer(const char *funcname, StringInfo outs, bool need_lock)
 {
-	static StringInfo	s;
-	static StringInfo	ss = NULL;
-	int	ii;
-	PR_BufChunk	*curr_chunk;
-	bool	rv = true;
+// 	static StringInfo	s;
+// 	static StringInfo	ss = NULL;
+// 	int	ii;
+// 	PR_BufChunk	*curr_chunk;
+// 	bool	rv = true;
 
-#if 1
-	return true;
-#endif
+// #if 1
+// 	return true;
+// #endif
 
-	if (!pr_buffer->dump_opt)
-		return true;
-	if (outs == NULL)
-	{
-		if (ss ==  NULL)
-			s = ss = makeStringInfo();
-		else
-		{
-			resetStringInfo(ss);
-			s = ss;
-		}
-	}
-	else
-		s = outs;
+// 	if (!pr_buffer->dump_opt)
+// 		return true;
+// 	if (outs == NULL)
+// 	{
+// 		if (ss ==  NULL)
+// 			s = ss = makeStringInfo();
+// 		else
+// 		{
+// 			resetStringInfo(ss);
+// 			s = ss;
+// 		}
+// 	}
+// 	else
+// 		s = outs;
 
-	if (need_lock)
-		lock_buffer();
-	appendStringInfo(s, "\n\n===<< Buffer area dump: func: %s, worker: %d >>=================\n", funcname, my_worker_idx);
-	appendStringInfo(s, "Pr_buffer: 0x%p, updated: %ld,\n", pr_buffer, pr_buffer->update_sno);
-	appendStringInfo(s, "head: 0x%p (%ld), tail: 0x%p (%ld)\n",
-								pr_buffer->head, addr_difference(pr_buffer, pr_buffer->head),
-								pr_buffer->tail, addr_difference(pr_buffer, pr_buffer->tail));
-	appendStringInfo(s, "alloc_start: 0x%p (%ld), alloc_end: 0x%p (%ld)\n",
-								pr_buffer->alloc_start, addr_difference(pr_buffer, pr_buffer->alloc_start),
-								pr_buffer->alloc_end, addr_difference(pr_buffer, pr_buffer->alloc_end));
-	appendStringInfo(s, "needed_by_worker: 0x%p (%ld) (n_worker: %d)\n    ", 
-								(pr_buffer->needed_by_worker),
-								addr_difference(pr_buffer, pr_buffer->needed_by_worker),
-								num_preplay_workers);
+// 	if (need_lock)
+// 		lock_buffer();
+// 	appendStringInfo(s, "\n\n===<< Buffer area dump: func: %s, worker: %d >>=================\n", funcname, my_worker_idx);
+// 	appendStringInfo(s, "Pr_buffer: 0x%p, updated: %ld,\n", pr_buffer, pr_buffer->update_sno);
+// 	appendStringInfo(s, "head: 0x%p (%ld), tail: 0x%p (%ld)\n",
+// 								pr_buffer->head, addr_difference(pr_buffer, pr_buffer->head),
+// 								pr_buffer->tail, addr_difference(pr_buffer, pr_buffer->tail));
+// 	appendStringInfo(s, "alloc_start: 0x%p (%ld), alloc_end: 0x%p (%ld)\n",
+// 								pr_buffer->alloc_start, addr_difference(pr_buffer, pr_buffer->alloc_start),
+// 								pr_buffer->alloc_end, addr_difference(pr_buffer, pr_buffer->alloc_end));
+// 	appendStringInfo(s, "needed_by_worker: 0x%p (%ld) (n_worker: %d)\n    ", 
+// 								(pr_buffer->needed_by_worker),
+// 								addr_difference(pr_buffer, pr_buffer->needed_by_worker),
+// 								num_preplay_workers);
 
-	for (ii = 0; ii < num_preplay_workers; ii++)
-	{
-		if (ii == 0)
-			appendStringInfo(s, "(idx: %d, value: %ld)", ii, pr_buffer->needed_by_worker[ii]);
-		else
-			appendStringInfo(s, ", (idx: %d, value: %ld)", ii, pr_buffer->needed_by_worker[ii]);
-	}
+// 	for (ii = 0; ii < num_preplay_workers; ii++)
+// 	{
+// 		if (ii == 0)
+// 			appendStringInfo(s, "(idx: %d, value: %ld)", ii, pr_buffer->needed_by_worker[ii]);
+// 		else
+// 			appendStringInfo(s, ", (idx: %d, value: %ld)", ii, pr_buffer->needed_by_worker[ii]);
+// 	}
 
-	appendStringInfoString(s, "\n------<< Chunk List >>---------------\n");
-	/* Dump each chunk from the top */
-	for(curr_chunk = (PR_BufChunk *)(pr_buffer->head), ii = 0;
-			addr_before(curr_chunk, pr_buffer->tail);
-			curr_chunk = next_chunk(curr_chunk), ii++)
-	{
-		Size *size_at_tail;
+// 	appendStringInfoString(s, "\n------<< Chunk List >>---------------\n");
+// 	/* Dump each chunk from the top */
+// 	for(curr_chunk = (PR_BufChunk *)(pr_buffer->head), ii = 0;
+// 			addr_before(curr_chunk, pr_buffer->tail);
+// 			curr_chunk = next_chunk(curr_chunk), ii++)
+// 	{
+// 		Size *size_at_tail;
 
-		size_at_tail = SizeAtTail(curr_chunk);
-		if (curr_chunk->magic == PR_BufChunk_Allocated)
-		{
-			appendStringInfo(s, "Addr: 0x%016lx (%ld), SNO: %ld, Size: %ld, Magic: Allocated, Size_at_tail: %ld\n",
-									(uint64)curr_chunk,
-									addr_difference(pr_buffer, curr_chunk),
-									curr_chunk->sno,
-									curr_chunk->size,
-									*size_at_tail);
-		}
-		else if (curr_chunk->magic == PR_BufChunk_Free)
-		{
-			appendStringInfo(s, "Addr: 0x%016lx (%ld), Size: %ld, Magic: Free, Size_at_tail: %ld\n",
-									(uint64)curr_chunk,
-									addr_difference(pr_buffer, curr_chunk),
-									curr_chunk->size,
-									*size_at_tail);
-		}
-		else
-		{
-			appendStringInfo(s, "Addr: 0x%016lx (%ld), Size: %ld, **** ERRROR CHUNK **** Size_at_tail: %ld\n",
-									(uint64)curr_chunk,
-									addr_difference(pr_buffer, curr_chunk),
-									curr_chunk->size,
-									*size_at_tail);
-			rv = false;
-			break;
-		}
-	}
-	if (need_lock)
-		unlock_buffer();
-	appendStringInfoString(s, "------<< Chunk List End >>---------------\n");
-	appendStringInfoString(s, "===<< Buffer dump end >>=================\n\n");
-	if (outs == NULL)
-		PRDebug_out(s);
-	return rv;
+// 		size_at_tail = SizeAtTail(curr_chunk);
+// 		if (curr_chunk->magic == PR_BufChunk_Allocated)
+// 		{
+// 			appendStringInfo(s, "Addr: 0x%016lx (%ld), SNO: %ld, Size: %ld, Magic: Allocated, Size_at_tail: %ld\n",
+// 									(uint64)curr_chunk,
+// 									addr_difference(pr_buffer, curr_chunk),
+// 									curr_chunk->sno,
+// 									curr_chunk->size,
+// 									*size_at_tail);
+// 		}
+// 		else if (curr_chunk->magic == PR_BufChunk_Free)
+// 		{
+// 			appendStringInfo(s, "Addr: 0x%016lx (%ld), Size: %ld, Magic: Free, Size_at_tail: %ld\n",
+// 									(uint64)curr_chunk,
+// 									addr_difference(pr_buffer, curr_chunk),
+// 									curr_chunk->size,
+// 									*size_at_tail);
+// 		}
+// 		else
+// 		{
+// 			appendStringInfo(s, "Addr: 0x%016lx (%ld), Size: %ld, **** ERRROR CHUNK **** Size_at_tail: %ld\n",
+// 									(uint64)curr_chunk,
+// 									addr_difference(pr_buffer, curr_chunk),
+// 									curr_chunk->size,
+// 									*size_at_tail);
+// 			rv = false;
+// 			break;
+// 		}
+// 	}
+// 	if (need_lock)
+// 		unlock_buffer();
+// 	appendStringInfoString(s, "------<< Chunk List End >>---------------\n");
+// 	appendStringInfoString(s, "===<< Buffer dump end >>=================\n\n");
+// 	if (outs == NULL)
+// 		PRDebug_out(s);
+// 	return rv;
 }
 
 void
@@ -3061,56 +3063,56 @@ returning:
 static void
 dump_chunk(PR_BufChunk *chunk, const char *funcname, StringInfo outs, bool need_lock)
 {
-	StringInfo	s;
-	static StringInfo	ss = NULL;
-	Size	*size_at_tail;
+// 	StringInfo	s;
+// 	static StringInfo	ss = NULL;
+// 	Size	*size_at_tail;
 
-#if 1
-	return;
-#endif
-	if (!pr_buffer->dump_opt)
-		return;
+// #if 1
+// 	return;
+// #endif
+// 	if (!pr_buffer->dump_opt)
+// 		return;
 
-	if (outs == NULL)
-	{
-		if (ss == NULL)
-			ss = s = makeStringInfo();
-		else
-		{
-			s = ss;
-			resetStringInfo(s);
-		}
-	}
-	else
-		s = outs;
+// 	if (outs == NULL)
+// 	{
+// 		if (ss == NULL)
+// 			ss = s = makeStringInfo();
+// 		else
+// 		{
+// 			s = ss;
+// 			resetStringInfo(s);
+// 		}
+// 	}
+// 	else
+// 		s = outs;
 
-	appendStringInfo(s, "\n===<< Chunk dump: func: %s, Addr: 0x%p >>=================\n", funcname, chunk);
+// 	appendStringInfo(s, "\n===<< Chunk dump: func: %s, Addr: 0x%p >>=================\n", funcname, chunk);
 
-	if (need_lock)
-		lock_buffer();
+// 	if (need_lock)
+// 		lock_buffer();
 
-	size_at_tail = SizeAtTail(chunk);
-	appendStringInfo(s, "Buffer: 0x%p, head: 0x%p (%ld), tail: 0x%p (%ld), alloc_start: 0x%p (%ld), alloc_end: 0x%p (%ld).\n",
-			pr_buffer,
-			pr_buffer->head, addr_difference(pr_buffer->head, pr_buffer),
-			pr_buffer->tail, addr_difference(pr_buffer->tail, pr_buffer),
-			pr_buffer->alloc_start, addr_difference(pr_buffer->alloc_start, pr_buffer),
-			pr_buffer->alloc_end, addr_difference(pr_buffer->alloc_end,pr_buffer));
+// 	size_at_tail = SizeAtTail(chunk);
+// 	appendStringInfo(s, "Buffer: 0x%p, head: 0x%p (%ld), tail: 0x%p (%ld), alloc_start: 0x%p (%ld), alloc_end: 0x%p (%ld).\n",
+// 			pr_buffer,
+// 			pr_buffer->head, addr_difference(pr_buffer->head, pr_buffer),
+// 			pr_buffer->tail, addr_difference(pr_buffer->tail, pr_buffer),
+// 			pr_buffer->alloc_start, addr_difference(pr_buffer->alloc_start, pr_buffer),
+// 			pr_buffer->alloc_end, addr_difference(pr_buffer->alloc_end,pr_buffer));
 
-	if (chunk->magic == PR_BufChunk_Allocated)
-		appendStringInfo(s, "Adddr: 0x%p (%ld), SNO: %ld, size: %ld, magic: Allocated, size_at_tail: %ld\n",
-				chunk, addr_difference(pr_buffer, chunk), chunk->sno, chunk->size, *size_at_tail);
-	else if (chunk->magic == PR_BufChunk_Free)
-		appendStringInfo(s, "Adddr: 0x%p (%ld), size: %ld, magic: Free, size_at_tail: %ld\n",
-				chunk, addr_difference(pr_buffer, chunk), chunk->size, *size_at_tail);
-	else
-		appendStringInfo(s, "Addr: 0x%p (%ld), Size: %ld, **** ERRROR CHUNK **** Size_at_tail: %ld\n",
-			chunk, addr_difference(pr_buffer, chunk), chunk->size, *size_at_tail);
-	if (need_lock)
-		unlock_buffer();
-	appendStringInfoString(s, "===<< Chunk dump end >>=================\n\n");
-	if (outs == NULL)
-		PRDebug_out(s);
+// 	if (chunk->magic == PR_BufChunk_Allocated)
+// 		appendStringInfo(s, "Adddr: 0x%p (%ld), SNO: %ld, size: %ld, magic: Allocated, size_at_tail: %ld\n",
+// 				chunk, addr_difference(pr_buffer, chunk), chunk->sno, chunk->size, *size_at_tail);
+// 	else if (chunk->magic == PR_BufChunk_Free)
+// 		appendStringInfo(s, "Adddr: 0x%p (%ld), size: %ld, magic: Free, size_at_tail: %ld\n",
+// 				chunk, addr_difference(pr_buffer, chunk), chunk->size, *size_at_tail);
+// 	else
+// 		appendStringInfo(s, "Addr: 0x%p (%ld), Size: %ld, **** ERRROR CHUNK **** Size_at_tail: %ld\n",
+// 			chunk, addr_difference(pr_buffer, chunk), chunk->size, *size_at_tail);
+// 	if (need_lock)
+// 		unlock_buffer();
+// 	appendStringInfoString(s, "===<< Chunk dump end >>=================\n\n");
+// 	if (outs == NULL)
+// 		PRDebug_out(s);
 }
 
 #endif
@@ -3141,10 +3143,10 @@ PR_allocBuffer(Size sz, bool need_lock)
 static void *
 PR_allocBuffer_int(Size sz, bool need_lock, bool retry_opt)
 {
-	ereport(LOG,(errmsg("++++alloc int start")));
 	PR_BufChunk	*new_chunk;
 	Size		 chunk_sz;
 	void		*rv;
+	void* 		ptr;
 #if 0
 #ifdef WAL_DEBUG
 	static StringInfo	 s = NULL;
@@ -3152,40 +3154,19 @@ PR_allocBuffer_int(Size sz, bool need_lock, bool retry_opt)
 #endif
 
 
-#if 0
-#ifdef WAL_DEBUG
-	if (s == NULL)
-		s = makeStringInfo();
-	else
-		resetStringInfo(s);
-
-	appendStringInfo(s, "--- %s: allocation size: %lu ---\n", __func__, sz);
-	dump_buffer(__func__, s, need_lock);
-	PRDebug_out(s);
-	resetStringInfo(s);
-#endif
-#endif
-
 	if (need_lock)
 		lock_buffer();
 
 #ifdef WAL_DEBUG
 	pr_buffer->update_sno++;
 #endif
-	chunk_sz = normalized_size(sz) + CHUNK_OVERHEAD;
-
-	new_chunk = alloc_chunk(chunk_sz);
+	ptr = tlsf_malloc(pr_buffer->tlsf, sz);  // 在内存池上分配内存
 	if (need_lock)
 		unlock_buffer();
-	if (new_chunk)
+	if (ptr)
 	{
 		/* Successful to allocate buffer */
-#if 0
-#ifdef WAL_DEBUG
-		dump_chunk(new_chunk, __func__, s, need_lock);
-#endif
-#endif
-		return &new_chunk->data[0];
+		return ptr;
 	}
 
 	/* Now no free chunk was available */
@@ -3203,7 +3184,7 @@ PR_allocBuffer_int(Size sz, bool need_lock, bool retry_opt)
 	dump_chunk(new_chunk, __func__, s, need_lock);
 #endif
 #endif
-	ereport(LOG,(errmsg("++++alloc int end")));
+
 	return rv;
 }
 
@@ -3251,207 +3232,92 @@ retry_allocBuffer(Size sz, bool need_lock)
 /*
  * Allocate chunk in the free area.  pr_buffer->slock has to be acquired by the caller.
  */
-#if 0
+
 static PR_BufChunk *
 alloc_chunk(Size chunk_sz)
 {
-	PR_BufChunk	*free_chunk;	/* Free chunk to allocate new chunk */
-	PR_BufChunk	*new_free_chunk;
-	PR_BufChunk *new_chunk;
-	Size		 new_free_chunk_size;
-	Size		*size_at_tail_free;
-	Size		*size_at_tail_new;
-
-	/* Arrange the size to boundary */
-	chunk_sz = size_boundary(chunk_sz);
-
-	free_chunk = (PR_BufChunk *)pr_buffer->alloc_start;
-
-	Assert(free_chunk->magic == PR_BufChunk_Free);
-
-	if (pr_buffer->alloc_start == pr_buffer->alloc_end)
-		/* No more area to allocate */
-		return NULL;
-
-	if (free_chunk->size >= chunk_sz)
-	{
-		/* Can allocate chunk from this free chunk */
-		if (free_chunk->size > (chunk_sz + CHUNK_OVERHEAD))
-		{
-			/* Next start will begin after this new chunk */
-			/* Next block is almost identical to the following one. */
-			/* Ned improvement for more portable code */
-			new_free_chunk_size = free_chunk->size - chunk_sz;
-
-			new_chunk = free_chunk;
-			new_free_chunk = addr_forward(free_chunk, chunk_sz);
-
-			new_chunk->size = chunk_sz;
-			new_chunk->magic = PR_BufChunk_Allocated;
-			new_chunk->sno = pr_buffer->curr_sno++;
-			size_at_tail_new = SizeAtTail(new_chunk);
-			*size_at_tail_new = chunk_sz;
-
-			new_free_chunk->size = new_free_chunk_size;
-			new_free_chunk->magic = PR_BufChunk_Free;
-			size_at_tail_free = SizeAtTail(new_free_chunk);
-			*size_at_tail_free = new_free_chunk_size;
-
-			pr_buffer->alloc_start = new_chunk;
-			return new_chunk;
-		}
-		else
-		{
-			/* Whole current free chunk has to be new chunk */
-			free_chunk->magic = PR_BufChunk_Allocated;
-			pr_buffer->alloc_start = next_chunk(free_chunk);
-			if (pr_buffer->alloc_start == pr_buffer->tail)
-			{
-				pr_buffer->alloc_start = pr_buffer->head;
-				if (pr_buffer->alloc_end == pr_buffer->tail)
-					pr_buffer->alloc_end = pr_buffer->head;
-			}
-			return free_chunk;
-		}
-	}
-	else if (addr_before(pr_buffer->alloc_end, pr_buffer->alloc_start))
-	{
-		/* We need to allocate the chunk from next free chunk, at the beginning */
-		free_chunk = pr_buffer->head;
-
-		if (free_chunk->magic != PR_BufChunk_Free)
-			/* No more area to allocate */
-			return NULL;
-		if (free_chunk->size < chunk_sz)
-			return NULL;
-		if (free_chunk->size > (chunk_sz + CHUNK_OVERHEAD))
-		{
-			/* Next start will begin after this new chunk */
-			/* Next block is almost identical to the above one. */
-			/* Ned improvement for more portable code */
-			new_free_chunk_size = free_chunk->size - chunk_sz;
-
-			new_chunk = free_chunk;
-			new_free_chunk = addr_forward(free_chunk, chunk_sz);
-
-			new_chunk->size = chunk_sz;
-			new_chunk->magic = PR_BufChunk_Allocated;
-			new_chunk->sno = pr_buffer->curr_sno++;
-			size_at_tail_new = SizeAtTail(new_chunk);
-			*size_at_tail_new = chunk_sz;
-
-			new_free_chunk->size = new_free_chunk_size;
-			new_free_chunk->magic = PR_BufChunk_Free;
-			size_at_tail_free = SizeAtTail(new_free_chunk);
-			*size_at_tail_free = new_free_chunk_size;
-
-			pr_buffer->alloc_start = new_free_chunk;
-			return new_chunk;
-		}
-		else
-		{
-			/* Whole current free chunk has to be new chunk */
-			free_chunk->magic = PR_BufChunk_Allocated;
-			pr_buffer->alloc_start = next_chunk(free_chunk);
-			if (pr_buffer->alloc_start == pr_buffer->tail)
-			{
-				pr_buffer->alloc_start = pr_buffer->head;
-				if (pr_buffer->alloc_end == pr_buffer->tail)
-					pr_buffer->alloc_end = pr_buffer->head;
-			}
-			return free_chunk;
-		}
-	}
-
-	return NULL;
-}
-/* Old version */
-#else
-static PR_BufChunk *
-alloc_chunk(Size chunk_sz)
-{
-	PR_BufChunk	*base_chunk;	/* Candidate free chunk to allocate new chunk */
-	PR_BufChunk	*new_free_chunk;
-	Size		 new_free_chunk_size;
-	Size		*size_at_tail;
+	// PR_BufChunk	*base_chunk;	/* Candidate free chunk to allocate new chunk */
+	// PR_BufChunk	*new_free_chunk;
+	// Size		 new_free_chunk_size;
+	// Size		*size_at_tail;
 
 
-	if (pr_buffer->alloc_start == pr_buffer->alloc_end)
-		/* No space left */
-		return NULL;
+	// if (pr_buffer->alloc_start == pr_buffer->alloc_end)
+	// 	/* No space left */
+	// 	return NULL;
 
-	base_chunk = (PR_BufChunk *)pr_buffer->alloc_start;
-	if (base_chunk->size >= chunk_sz)
-	{
-		/*
-		 * There's sufficient free area to assing the chunk.
-		 */
-		if (base_chunk->size > chunk_sz + CHUNK_OVERHEAD)
-		{
-			/* Current free chunk can be divided into alloc chunk and free chunk */
-			/*
-			 * Divide free chunk into allocated chunk and remainig free chunk.
-			 */
-			new_free_chunk_size = base_chunk->size - chunk_sz;
-			new_free_chunk = addr_forward(pr_buffer->alloc_start, chunk_sz);
-			base_chunk->size = chunk_sz;
-			size_at_tail = SizeAtTail(base_chunk);
-			*size_at_tail = chunk_sz;
-			new_free_chunk->size = new_free_chunk_size;
-			size_at_tail = SizeAtTail(new_free_chunk);
-			*size_at_tail = new_free_chunk_size;
-			base_chunk->magic = PR_BufChunk_Allocated;
-			new_free_chunk->magic = PR_BufChunk_Free;
-			pr_buffer->alloc_start = (void *)new_free_chunk;
-		}
-		else
-		{
-			/*
-			 * Current free chunk is sufficient to allocate new chunk but remaining
-			 * area is not large enough to allocate free chunk.
-			 * In this case, all the free are is returned and alloc_start becomes
-			 * same as alloc_end eventually.
-			 */
-			base_chunk->magic = PR_BufChunk_Allocated;
-			pr_buffer->alloc_start = next_chunk(base_chunk);
-		}
-		base_chunk->sno = pr_buffer->curr_sno++;
-		return base_chunk;
-	}
-	else if (addr_before_eq(pr_buffer->alloc_start, pr_buffer->alloc_end))
-	{
-		/* No free area before alloc_start.  Can allocate no chunk */
-		return NULL;
-	}
-	else
-	{
-		/*
-		 * Try to allocate the buffer in another free buffer area.
-		 */
-		if (addr_before(pr_buffer->alloc_end, pr_buffer->alloc_start))
-		{
-			PR_BufChunk *new_chunk;
-			void		*old_alloc_start;
+	// base_chunk = (PR_BufChunk *)pr_buffer->alloc_start;
+	// if (base_chunk->size >= chunk_sz)
+	// {
+	// 	/*
+	// 	 * There's sufficient free area to assing the chunk.
+	// 	 */
+	// 	if (base_chunk->size > chunk_sz + CHUNK_OVERHEAD)
+	// 	{
+	// 		/* Current free chunk can be divided into alloc chunk and free chunk */
+	// 		/*
+	// 		 * Divide free chunk into allocated chunk and remainig free chunk.
+	// 		 */
+	// 		new_free_chunk_size = base_chunk->size - chunk_sz;
+	// 		new_free_chunk = addr_forward(pr_buffer->alloc_start, chunk_sz);
+	// 		base_chunk->size = chunk_sz;
+	// 		size_at_tail = SizeAtTail(base_chunk);
+	// 		*size_at_tail = chunk_sz;
+	// 		new_free_chunk->size = new_free_chunk_size;
+	// 		size_at_tail = SizeAtTail(new_free_chunk);
+	// 		*size_at_tail = new_free_chunk_size;
+	// 		base_chunk->magic = PR_BufChunk_Allocated;
+	// 		new_free_chunk->magic = PR_BufChunk_Free;
+	// 		pr_buffer->alloc_start = (void *)new_free_chunk;
+	// 	}
+	// 	else
+	// 	{
+	// 		/*
+	// 		 * Current free chunk is sufficient to allocate new chunk but remaining
+	// 		 * area is not large enough to allocate free chunk.
+	// 		 * In this case, all the free are is returned and alloc_start becomes
+	// 		 * same as alloc_end eventually.
+	// 		 */
+	// 		base_chunk->magic = PR_BufChunk_Allocated;
+	// 		pr_buffer->alloc_start = next_chunk(base_chunk);
+	// 	}
+	// 	base_chunk->sno = pr_buffer->curr_sno++;
+	// 	return base_chunk;
+	// }
+	// else if (addr_before_eq(pr_buffer->alloc_start, pr_buffer->alloc_end))
+	// {
+	// 	/* No free area before alloc_start.  Can allocate no chunk */
+	// 	return NULL;
+	// }
+	// else
+	// {
+	// 	/*
+	// 	 * Try to allocate the buffer in another free buffer area.
+	// 	 */
+	// 	if (addr_before(pr_buffer->alloc_end, pr_buffer->alloc_start))
+	// 	{
+	// 		PR_BufChunk *new_chunk;
+	// 		void		*old_alloc_start;
 
-			old_alloc_start = pr_buffer->alloc_start;
-			pr_buffer->alloc_start = pr_buffer->head;
-			new_chunk =  alloc_chunk(chunk_sz);
-			if (new_chunk == NULL)
-			{
-				/*
-				 * If no space is left, restore alloc_start for subsequent request
-				 * if the requested size is smaller.
-				 */
-				pr_buffer->alloc_start = old_alloc_start;
-			}
-			else
-				new_chunk->sno = pr_buffer->curr_sno++;
-			return new_chunk;
-		}
-	}
+	// 		old_alloc_start = pr_buffer->alloc_start;
+	// 		pr_buffer->alloc_start = pr_buffer->head;
+	// 		new_chunk =  alloc_chunk(chunk_sz);
+	// 		if (new_chunk == NULL)
+	// 		{
+	// 			/*
+	// 			 * If no space is left, restore alloc_start for subsequent request
+	// 			 * if the requested size is smaller.
+	// 			 */
+	// 			pr_buffer->alloc_start = old_alloc_start;
+	// 		}
+	// 		else
+	// 			new_chunk->sno = pr_buffer->curr_sno++;
+	// 		return new_chunk;
+	// 	}
+	// }
 	return NULL;	/* Does not reach here */
 }
-#endif
+
 
 #ifdef WAL_DEBUG
 /*
@@ -3463,10 +3329,11 @@ alloc_chunk(Size chunk_sz)
 bool
 PR_bufferCheck(StringInfo s, void *addr, bool need_lock)
 {
-	PR_BufChunk *chunk;
+	// PR_BufChunk *chunk;
 
-	chunk = find_chunk(s, addr, need_lock);
-	return(chunk == NULL ? false : true);
+	// chunk = find_chunk(s, addr, need_lock);
+	// return(chunk == NULL ? false : true);
+	return true;
 }
 
 /*
@@ -3536,13 +3403,6 @@ PR_freeBuffer(void *buffer, bool need_lock)
 	PR_BufChunk	*chunk;
 	int			 ii;
 	static bool *sync_alloc_target = NULL;
-#if 0
-#ifdef WAL_DEBUG
-	static StringInfo	s = NULL;
-#endif
-#endif
-
-
 	/*
 	 * Initialize sync target structure if needed.
 	 */
@@ -3551,54 +3411,28 @@ PR_freeBuffer(void *buffer, bool need_lock)
 
 	/* Do not forget to ping reader or dispatcher if there's free area available */
 	/* Ping the reader worker only when dispatcher does not require the buffer */
-
-#if 0
-#ifdef WAL_DEBUG
-	if (s == NULL)
-		s = makeStringInfo();
-	else
-		resetStringInfo(s);
-	appendStringInfo(s, "--- %s: freeing: %p ---\n", __func__, buffer);
-	dump_chunk(Chunk(buffer), __func__, s, need_lock);
-	dump_buffer(__func__, s, need_lock);
-	PRDebug_out(s);
-	resetStringInfo(s);
-
-#endif
-#endif
-	if (addr_before(buffer, pr_buffer->head) || addr_after(buffer, pr_buffer->tail))
-		return;
+	// if (addr_before(buffer, pr_buffer->head) || addr_after(buffer, pr_buffer->tail))
+	// 	return;
 
 	if (need_lock)
 		lock_buffer();
 #ifdef WAL_DEBUG
 	pr_buffer->update_sno++;
 #endif
-	chunk = Chunk(buffer);
-	if (chunk->magic != PR_BufChunk_Allocated)
-	{
-		if (need_lock)
-			unlock_buffer();
-#ifdef WAL_DEBUG
-		PRDebug_log("Attempt to free wrong buffer. Addr: 0x%p.\n", buffer);
-#endif
-		elog(LOG, "Attempt to free wrong buffer.");
-		return;
-	}
-#if 0
-#ifdef WAL_DEBUG
-	resetStringInfo(s);
-#endif
-#endif
+// 	chunk = Chunk(buffer);
+// 	if (chunk->magic != PR_BufChunk_Allocated)
+// 	{
+// 		if (need_lock)
+// 			unlock_buffer();
+// #ifdef WAL_DEBUG
+// 		PRDebug_log("Attempt to free wrong buffer. Addr: 0x%p.\n", buffer);
+// #endif
+// 		elog(LOG, "Attempt to free wrong buffer.");
+// 		return;
+// 	}
+	tlsf_free(pr_buffer->tlsf, buffer);  // 释放内存
 
-	free_chunk(chunk);
-
-#if 0
-#ifdef WAL_DEBUG
-	dump_buffer(__func__, s, false);
-	PRDebug_out(s);
-#endif
-#endif
+	
 
 	/*
 	 * Now successfully freed buffer.
@@ -3662,142 +3496,142 @@ PR_freeBuffer(void *buffer, bool need_lock)
 static void
 free_chunk(PR_BufChunk *chunk)
 {
-	PR_BufChunk	*new_chunk;
-	PR_BufChunk *head_chunk;
+// 	PR_BufChunk	*new_chunk;
+// 	PR_BufChunk *head_chunk;
 
-	if (chunk->magic != PR_BufChunk_Allocated)
-		return;
-	chunk->magic = PR_BufChunk_Free;
-	if (chunk == pr_buffer->head)
-	{
-		new_chunk = concat_next_chunk(chunk);
-		if (pr_buffer->alloc_end == pr_buffer->tail)
-		{
-			pr_buffer->alloc_end = next_chunk(new_chunk);
-			if (pr_buffer->alloc_start == pr_buffer->alloc_end)
-			{
-				pr_buffer->alloc_start = pr_buffer->head;
-				pr_buffer->alloc_end = pr_buffer->tail;
-			}
-		}
-		goto returning;
-	}
-	if (next_chunk(chunk) == pr_buffer->tail)
-	{
-		if (next_chunk(chunk) == pr_buffer->tail)
-		{
-			new_chunk = concat_prev_chunk(chunk);
-			pr_buffer->alloc_end = pr_buffer->tail;
-		}
-		else
-			concat_prev_chunk(chunk);
-		goto returning;
+// 	if (chunk->magic != PR_BufChunk_Allocated)
+// 		return;
+// 	chunk->magic = PR_BufChunk_Free;
+// 	if (chunk == pr_buffer->head)
+// 	{
+// 		new_chunk = concat_next_chunk(chunk);
+// 		if (pr_buffer->alloc_end == pr_buffer->tail)
+// 		{
+// 			pr_buffer->alloc_end = next_chunk(new_chunk);
+// 			if (pr_buffer->alloc_start == pr_buffer->alloc_end)
+// 			{
+// 				pr_buffer->alloc_start = pr_buffer->head;
+// 				pr_buffer->alloc_end = pr_buffer->tail;
+// 			}
+// 		}
+// 		goto returning;
+// 	}
+// 	if (next_chunk(chunk) == pr_buffer->tail)
+// 	{
+// 		if (next_chunk(chunk) == pr_buffer->tail)
+// 		{
+// 			new_chunk = concat_prev_chunk(chunk);
+// 			pr_buffer->alloc_end = pr_buffer->tail;
+// 		}
+// 		else
+// 			concat_prev_chunk(chunk);
+// 		goto returning;
 
-	}
-	if (addr_before(pr_buffer->alloc_start, pr_buffer->alloc_end))
-	{
-		if (((void *)chunk == pr_buffer->head) && ((void *)next_chunk(chunk) == pr_buffer->alloc_start))
-		{
-			/* (1) Chunk is the whole area from head to alloc_start */
-			new_chunk = concat_next_chunk(chunk);
-			pr_buffer->alloc_start = pr_buffer->head;
-		}
-		else if (((void *)chunk == pr_buffer->alloc_end) && (next_chunk(chunk) == pr_buffer->tail))
-		{
-			/* (2) Chunk is whole from alloc_end to tail */
-			new_chunk = concat_prev_chunk(chunk);
-			pr_buffer->alloc_end = pr_buffer->tail;
-		}
-		else if ((void *)next_chunk(chunk) == pr_buffer->alloc_start)
-		{
-			/* (3) The chunk is just before allocation start point */
-			new_chunk = concat_surrounding_chunks(chunk);
-			pr_buffer->alloc_start = (void *)new_chunk;
-		}
-		else if (addr_before(next_chunk(chunk), pr_buffer->alloc_start))
-			/*
-			 * (4) Chunk is in the begging part and other allocated chunks exists
-			 *     between this chunk and pr_buffer->alloc_start
-			 */
-			concat_surrounding_chunks(chunk);
-		else if ((void *)chunk == pr_buffer->alloc_end)
-		{
-			/* (5) Chunk is just after pr_buffer->allloc_end. */
-			new_chunk = concat_surrounding_chunks(chunk);
-			pr_buffer->alloc_end = next_chunk(new_chunk);
-		}
-		else if ((void *)chunk == pr_buffer->head && pr_buffer->alloc_end == pr_buffer->tail)
-		{
-			/*
-			 * (6) Chunk is at the beginning of the buffer pool and
-			 *     alloc_end == tail.   In this case, this (concatenated) chunk additional
-			 *     free area.
-			 */
-			new_chunk = concat_next_chunk(chunk);
-			pr_buffer->alloc_end = next_chunk(chunk);
-		}
-		else
-			/*
-			 * (7) Chunk is in the middle between head and alloc_start
-			 *     or alloc_end and tail
-			 */
-			concat_surrounding_chunks(chunk);
-	}
-	else if (addr_after(pr_buffer->alloc_start, pr_buffer->alloc_end))
-	{
-		if (((void *)chunk == pr_buffer->alloc_end) && ((void *)next_chunk(chunk) == pr_buffer->alloc_start))
-		{
-			/* (8) Chunk is the whole allocated area */
-			concat_surrounding_chunks(chunk);
-			pr_buffer->alloc_start = pr_buffer->head;
-			pr_buffer->alloc_end = pr_buffer->tail;
-		}
-		else if ((void *)chunk == pr_buffer->alloc_end)
-		{
-			/* (9) Chunk is just after pr_buffer->alloc_end */
-			new_chunk = concat_surrounding_chunks(chunk);
-			pr_buffer->alloc_end = next_chunk(new_chunk);
-		}
-		else if ((void *)next_chunk(chunk) == pr_buffer->alloc_start)
-		{
-			/* (10) Chunk is just before pr_buffer->alloc_start */
-			new_chunk = concat_surrounding_chunks(chunk);
-			pr_buffer->alloc_start = new_chunk;
-		}
-		else
-			/* (11) Chunk is in the midddle of alloc_end and alloc_start */
-			concat_surrounding_chunks(chunk);
-	}
-	else
-	{
-		Assert(pr_buffer->alloc_start == pr_buffer->alloc_end);
+// 	}
+// 	if (addr_before(pr_buffer->alloc_start, pr_buffer->alloc_end))
+// 	{
+// 		if (((void *)chunk == pr_buffer->head) && ((void *)next_chunk(chunk) == pr_buffer->alloc_start))
+// 		{
+// 			/* (1) Chunk is the whole area from head to alloc_start */
+// 			new_chunk = concat_next_chunk(chunk);
+// 			pr_buffer->alloc_start = pr_buffer->head;
+// 		}
+// 		else if (((void *)chunk == pr_buffer->alloc_end) && (next_chunk(chunk) == pr_buffer->tail))
+// 		{
+// 			/* (2) Chunk is whole from alloc_end to tail */
+// 			new_chunk = concat_prev_chunk(chunk);
+// 			pr_buffer->alloc_end = pr_buffer->tail;
+// 		}
+// 		else if ((void *)next_chunk(chunk) == pr_buffer->alloc_start)
+// 		{
+// 			/* (3) The chunk is just before allocation start point */
+// 			new_chunk = concat_surrounding_chunks(chunk);
+// 			pr_buffer->alloc_start = (void *)new_chunk;
+// 		}
+// 		else if (addr_before(next_chunk(chunk), pr_buffer->alloc_start))
+// 			/*
+// 			 * (4) Chunk is in the begging part and other allocated chunks exists
+// 			 *     between this chunk and pr_buffer->alloc_start
+// 			 */
+// 			concat_surrounding_chunks(chunk);
+// 		else if ((void *)chunk == pr_buffer->alloc_end)
+// 		{
+// 			/* (5) Chunk is just after pr_buffer->allloc_end. */
+// 			new_chunk = concat_surrounding_chunks(chunk);
+// 			pr_buffer->alloc_end = next_chunk(new_chunk);
+// 		}
+// 		else if ((void *)chunk == pr_buffer->head && pr_buffer->alloc_end == pr_buffer->tail)
+// 		{
+// 			/*
+// 			 * (6) Chunk is at the beginning of the buffer pool and
+// 			 *     alloc_end == tail.   In this case, this (concatenated) chunk additional
+// 			 *     free area.
+// 			 */
+// 			new_chunk = concat_next_chunk(chunk);
+// 			pr_buffer->alloc_end = next_chunk(chunk);
+// 		}
+// 		else
+// 			/*
+// 			 * (7) Chunk is in the middle between head and alloc_start
+// 			 *     or alloc_end and tail
+// 			 */
+// 			concat_surrounding_chunks(chunk);
+// 	}
+// 	else if (addr_after(pr_buffer->alloc_start, pr_buffer->alloc_end))
+// 	{
+// 		if (((void *)chunk == pr_buffer->alloc_end) && ((void *)next_chunk(chunk) == pr_buffer->alloc_start))
+// 		{
+// 			/* (8) Chunk is the whole allocated area */
+// 			concat_surrounding_chunks(chunk);
+// 			pr_buffer->alloc_start = pr_buffer->head;
+// 			pr_buffer->alloc_end = pr_buffer->tail;
+// 		}
+// 		else if ((void *)chunk == pr_buffer->alloc_end)
+// 		{
+// 			/* (9) Chunk is just after pr_buffer->alloc_end */
+// 			new_chunk = concat_surrounding_chunks(chunk);
+// 			pr_buffer->alloc_end = next_chunk(new_chunk);
+// 		}
+// 		else if ((void *)next_chunk(chunk) == pr_buffer->alloc_start)
+// 		{
+// 			/* (10) Chunk is just before pr_buffer->alloc_start */
+// 			new_chunk = concat_surrounding_chunks(chunk);
+// 			pr_buffer->alloc_start = new_chunk;
+// 		}
+// 		else
+// 			/* (11) Chunk is in the midddle of alloc_end and alloc_start */
+// 			concat_surrounding_chunks(chunk);
+// 	}
+// 	else
+// 	{
+// 		Assert(pr_buffer->alloc_start == pr_buffer->alloc_end);
 
-		/* Now no space left in the buffer pool.   alloc_start == alloc_end */
-		/*
-		 * We need to use current alloc_start and alloc_end so that 
-		 * buffer near current_start will be freed first.
-		 */
-		if ((void *)chunk == pr_buffer->alloc_end)
-		{
-			/* (12) Releasing chunk just before alloc_start/alloc_end */
-			chunk = concat_next_chunk(chunk);	/* Concat just in case */
-			pr_buffer->alloc_end = next_chunk(chunk);
-		}
-		else if ((void *)next_chunk(chunk) == pr_buffer->alloc_start)
-		{
-			/* (13) Releasing chunk just after alloc_start/alloc_end */
-			chunk = concat_prev_chunk(chunk);
-			pr_buffer->alloc_start = chunk;
-		}
-		else
-			/* (14) Releasing chunk in intermediate place */
-			concat_surrounding_chunks(chunk);
-	}
-returning:
-	head_chunk = (PR_BufChunk *)(pr_buffer->head);
+// 		/* Now no space left in the buffer pool.   alloc_start == alloc_end */
+// 		/*
+// 		 * We need to use current alloc_start and alloc_end so that 
+// 		 * buffer near current_start will be freed first.
+// 		 */
+// 		if ((void *)chunk == pr_buffer->alloc_end)
+// 		{
+// 			/* (12) Releasing chunk just before alloc_start/alloc_end */
+// 			chunk = concat_next_chunk(chunk);	/* Concat just in case */
+// 			pr_buffer->alloc_end = next_chunk(chunk);
+// 		}
+// 		else if ((void *)next_chunk(chunk) == pr_buffer->alloc_start)
+// 		{
+// 			/* (13) Releasing chunk just after alloc_start/alloc_end */
+// 			chunk = concat_prev_chunk(chunk);
+// 			pr_buffer->alloc_start = chunk;
+// 		}
+// 		else
+// 			/* (14) Releasing chunk in intermediate place */
+// 			concat_surrounding_chunks(chunk);
+// 	}
+// returning:
+// 	head_chunk = (PR_BufChunk *)(pr_buffer->head);
 
-	if ((pr_buffer->alloc_end == pr_buffer->tail) && (head_chunk->magic == PR_BufChunk_Free))
-		pr_buffer->alloc_end = next_chunk(head_chunk);
+// 	if ((pr_buffer->alloc_end == pr_buffer->tail) && (head_chunk->magic == PR_BufChunk_Free))
+// 		pr_buffer->alloc_end = next_chunk(head_chunk);
 
 	return;
 }
@@ -3882,13 +3716,14 @@ initBuffer(void)
 
 	pr_buffer->head = addr_forward(pr_buffer->allocated_buffer, (pr_sizeof(void *) * num_preplay_workers));
 	pr_buffer->tail = addr_forward(pr_buffer, buffer_size());
-	pr_buffer->alloc_start = pr_buffer->head;
-	pr_buffer->alloc_end = pr_buffer->tail;
-	chunk = (PR_BufChunk *)pr_buffer->alloc_start;
-	chunk->size = addr_difference(pr_buffer->tail, pr_buffer->head);
-	chunk->magic = PR_BufChunk_Free;
-	size_at_tail = SizeAtTail(chunk);
-	*size_at_tail = chunk->size;
+	// pr_buffer->alloc_start = pr_buffer->head;
+	// pr_buffer->alloc_end = pr_buffer->tail;
+	// chunk = (PR_BufChunk *)pr_buffer->alloc_start;
+	// chunk->size = addr_difference(pr_buffer->tail, pr_buffer->head);
+	// chunk->magic = PR_BufChunk_Free;
+	// size_at_tail = SizeAtTail(chunk);
+	// *size_at_tail = chunk->size;
+	pr_buffer->tlsf = tlsf_create_with_pool(pr_buffer->head, pr_buffer->tail - pr_buffer->head);
 #ifdef WAL_DEBUG
 	pr_buffer->dump_opt = true;
 	pr_buffer->update_sno = 0;
@@ -4127,11 +3962,7 @@ PRDebug_start(int worker_idx)
 	struct stat statbuf;
 	int		rv;
 	int		my_errno;
-	char	found_debug_file = true;
-
-
-// hhhhhh
-
+	char	found_debug_file = false;
 	static const int start_timeout = 60 * 10;	/* start timeout = 10min */
 	int		time_waiting = 0;
 	char	*break_point_fname;
@@ -4164,32 +3995,108 @@ PRDebug_start(int worker_idx)
 				"-ex 'continue'\n",
 			getpid(), worker_idx, pr_debug_signal_file,
 			getpid(), break_point_fname, pr_debug_signal_file);
-	// while((found_debug_file == false) && (time_waiting < start_timeout))
-	// {
-	// 	rv = stat(pr_debug_signal_file, &statbuf);
-	// 	my_errno = errno;
-	// 	if (rv)
-	// 	{
-	// 		if (my_errno == ENOENT)
-	// 		{
-	// 			sleep(1);
-	// 			time_waiting++;
-	// 			continue;
-	// 		}
-	// 		else
-	// 		{
-	// 			PR_failing();
-	// 			elog(PANIC, "%s stat error, %s", pr_debug_signal_file, strerror(my_errno));
-	// 			printf("%s stat error, %s", pr_debug_signal_file, strerror(my_errno));
-	// 			exit(1);
-	// 		}
-	// 	}
-	// 	else
-	// 	{
-	// 		found_debug_file = true;
-	// 		break;
-	// 	}
-	// }
+	while((found_debug_file == false) && (time_waiting < start_timeout))
+	{
+		rv = stat(pr_debug_signal_file, &statbuf);
+		my_errno = errno;
+		if (rv)
+		{
+			if (my_errno == ENOENT)
+			{
+				sleep(1);
+				time_waiting++;
+				continue;
+			}
+			else
+			{
+				PR_failing();
+				elog(PANIC, "%s stat error, %s", pr_debug_signal_file, strerror(my_errno));
+				printf("%s stat error, %s", pr_debug_signal_file, strerror(my_errno));
+				exit(1);
+			}
+		}
+		else
+		{
+			found_debug_file = true;
+			break;
+		}
+	}
+	if (found_debug_file == true)
+	{
+		unlink(pr_debug_signal_file);
+		PRDebug_log("Detected %s.  Can begin debug\n", pr_debug_signal_file);
+	}
+	else
+		PRDebug_log("Could not find the file \"%s\". You may not be able to debug this.\n", pr_debug_signal_file);
+	PRDebug_sync();
+}
+
+
+void
+PRDebug2_start(int worker_idx)
+{
+	struct stat statbuf;
+	int		rv;
+	int		my_errno;
+	char	found_debug_file = false;
+	static const int start_timeout = 60 * 10;	/* start timeout = 10min */
+	int		time_waiting = 0;
+	char	*break_point_fname;
+
+	Assert(worker_idx >= 0);
+
+	my_worker_idx = worker_idx;
+	build_PRDebug_log_hdr();
+	pr_debug_signal_file = (char *)malloc(DEBUG_LOG_FILENAME_LEN);
+
+	/* Setup breakpoint file for each worker */
+	if (worker_idx < PR_BLK_WORKER_MIN_IDX)
+		break_point_fname = break_point_file[worker_idx];
+	else
+		break_point_fname = break_point_file[PR_BLK_WORKER_MIN_IDX];
+	
+	sprintf(pr_debug_signal_file, "%s/%s/%d.signal", DataDir, DEBUG_LOG_DIRNAME, my_worker_idx);
+	unlink(pr_debug_signal_file);
+	PRDebug_log("\n-------------------------------------------\n"
+				"Now ready to attach the debugger to pid %d.  "
+				"Set the break point to PRDebug_sync()\n"
+			    "My worker idx is %d.\nPlease touch %s to begin.  "
+				"I'm waiting for it.\n\n"
+				"Do following from another shell:\n"
+				"sudo gdb \\\n"
+				"-ex 'attach %d' \\\n"
+				"-ex 'tb PRDebug_sync' \\\n"
+				"-ex 'source %s' \\\n"
+				"-ex 'shell touch  %s' \\\n"
+				"-ex 'continue'\n",
+			getpid(), worker_idx, pr_debug_signal_file,
+			getpid(), break_point_fname, pr_debug_signal_file);
+	while((found_debug_file == false) && (time_waiting < start_timeout))
+	{
+		rv = stat(pr_debug_signal_file, &statbuf);
+		my_errno = errno;
+		if (rv)
+		{
+			if (my_errno == ENOENT)
+			{
+				sleep(1);
+				time_waiting++;
+				continue;
+			}
+			else
+			{
+				PR_failing();
+				elog(PANIC, "%s stat error, %s", pr_debug_signal_file, strerror(my_errno));
+				printf("%s stat error, %s", pr_debug_signal_file, strerror(my_errno));
+				exit(1);
+			}
+		}
+		else
+		{
+			found_debug_file = true;
+			break;
+		}
+	}
 	if (found_debug_file == true)
 	{
 		unlink(pr_debug_signal_file);
@@ -4223,34 +4130,33 @@ static char	*pr_debug_log_hdr = NULL;
 void
 PRDebug_log(char *fmt, ...)
 {
-	// char buf[PRDEBUG_BUFSZ];
-	// va_list	arg_ptr;
-	// ErrorContextCallback *error_context_stack_backup;
+	char buf[PRDEBUG_BUFSZ];
+	va_list	arg_ptr;
+	ErrorContextCallback *error_context_stack_backup;
 
-	// /*
-	//  * xlog.c sets up error_context_stack for writing
-	//  * XLogRecord info to the log using error_context_stack.
-	//  * This conflicts here so we disable this and the restore
-	//  */
-	// error_context_stack_backup = error_context_stack;
-	// error_context_stack = NULL;
+	/*
+	 * xlog.c sets up error_context_stack for writing
+	 * XLogRecord info to the log using error_context_stack.
+	 * This conflicts here so we disable this and the restore
+	 */
+	error_context_stack_backup = error_context_stack;
+	error_context_stack = NULL;
 
-	// va_start(arg_ptr, fmt);
-	// vsprintf(buf, fmt, arg_ptr);
+	va_start(arg_ptr, fmt);
+	vsprintf(buf, fmt, arg_ptr);
 
-	// /*
-	//  * It is dangerous to call this here because elog plugin may call DecodeXlogRecord, where
-	//  * decoded_record is still NULL, ending up with SIGSEGV.
+	/*
+	 * It is dangerous to call this here because elog plugin may call DecodeXlogRecord, where
+	 * decoded_record is still NULL, ending up with SIGSEGV.
 
-	// elog(LOG, "%s%s", pr_debug_log_hdr, buf);
+	elog(LOG, "%s%s", pr_debug_log_hdr, buf);
 
-	// */
-	// fprintf(pr_debug_log, "%s %s ===  %s",
-	// 		pr_debug_log_hdr, now_timeofday(), buf);
-	// fflush(pr_debug_log);
+	*/
+	fprintf(pr_debug_log, "%d %s %s ===  %s",
+			MyProcPid, pr_debug_log_hdr, now_timeofday(), buf);
+	fflush(pr_debug_log);
 
-	// error_context_stack = error_context_stack_backup;
-	return;
+	error_context_stack = error_context_stack_backup;
 }
 
 static char *
@@ -4584,11 +4490,11 @@ invalidPageWorkerLoop(void)
 		PRDebug_log("Fetched\n");
 		dump_invalidPageData(page);
 #endif	/* WAL_DEBUG */
-		PR_freeBuffer(page, true);
-		PR_sendSync(source_worker);
-#ifdef PR_IGNORE_REPLAY_ERROR
-		continue;
-#endif /* PR_IGNORE_REPLAY_ERROR */
+// 		PR_freeBuffer(page, true);
+// 		PR_sendSync(source_worker);
+// #ifdef PR_IGNORE_REPLAY_ERROR
+// 		continue;
+// #endif /* PR_IGNORE_REPLAY_ERROR */
 		switch(page->cmd)
 		{
 			case PR_LOG:

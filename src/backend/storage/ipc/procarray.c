@@ -92,6 +92,7 @@ typedef struct ProcArrayStruct
 	 */
 	TransactionId lastOverflowedXid;
 
+
 	/* oldest xmin of any replication slot */
 	TransactionId replication_slot_xmin;
 	/* oldest catalog xmin of any replication slot */
@@ -272,7 +273,7 @@ static TransactionId cachedXidIsNotInProgress = InvalidTransactionId;
  */
 static TransactionId *KnownAssignedXids;
 static bool *KnownAssignedXidsValid;
-static TransactionId latestObservedXid = InvalidTransactionId;
+static TransactionId* latestObservedXid;
 
 /*
  * If we're in STANDBY_SNAPSHOT_PENDING state, standbySnapshotPendingXmin is
@@ -455,6 +456,10 @@ CreateSharedProcArray(void)
 		KnownAssignedXidsValid = (bool *)
 			ShmemInitStruct("KnownAssignedXidsValid",
 							mul_size(sizeof(bool), TOTAL_MAX_CACHED_SUBXIDS),
+							&found);
+		latestObservedXid = (TransactionId *)
+			ShmemInitStruct("latestObservedXid",
+							sizeof(TransactionId),
 							&found);
 	}
 }
@@ -1029,8 +1034,8 @@ ProcArrayInitRecovery(TransactionId initializedUptoXID)
 	 * RecordKnownAssignedTransactionIds, and when we get consistent in
 	 * ProcArrayApplyRecoveryInfo().
 	 */
-	latestObservedXid = initializedUptoXID;
-	TransactionIdRetreat(latestObservedXid);
+	*latestObservedXid = initializedUptoXID;
+	TransactionIdRetreat(*latestObservedXid);
 }
 
 /*
@@ -1222,14 +1227,14 @@ ProcArrayApplyRecoveryInfo(RunningTransactions running)
 	 * because we've just added xids to the known assigned xids machinery that
 	 * haven't gone through RecordKnownAssignedTransactionId().
 	 */
-	Assert(TransactionIdIsNormal(latestObservedXid));
-	TransactionIdAdvance(latestObservedXid);
-	while (TransactionIdPrecedes(latestObservedXid, running->nextXid))
+	Assert(TransactionIdIsNormal(*latestObservedXid));
+	TransactionIdAdvance(*latestObservedXid);
+	while (TransactionIdPrecedes(*latestObservedXid, running->nextXid))
 	{
-		ExtendSUBTRANS(latestObservedXid);
-		TransactionIdAdvance(latestObservedXid);
+		ExtendSUBTRANS(*latestObservedXid);
+		TransactionIdAdvance(*latestObservedXid);
 	}
-	TransactionIdRetreat(latestObservedXid);	/* = running->nextXid - 1 */
+	TransactionIdRetreat(*latestObservedXid);	/* = running->nextXid - 1 */
 
 	/* ----------
 	 * Now we've got the running xids we need to set the global values that
@@ -1249,8 +1254,8 @@ ProcArrayApplyRecoveryInfo(RunningTransactions running)
 	{
 		standbyState = STANDBY_SNAPSHOT_PENDING;
 
-		standbySnapshotPendingXmin = latestObservedXid;
-		procArray->lastOverflowedXid = latestObservedXid;
+		standbySnapshotPendingXmin = *latestObservedXid;
+		procArray->lastOverflowedXid = *latestObservedXid;
 	}
 	else
 	{
@@ -1275,7 +1280,7 @@ ProcArrayApplyRecoveryInfo(RunningTransactions running)
 	LWLockRelease(ProcArrayLock);
 
 	/* ShmemVariableCache->nextXid must be beyond any observed xid. */
-	AdvanceNextFullTransactionIdPastXid(latestObservedXid);
+	AdvanceNextFullTransactionIdPastXid(*latestObservedXid);
 
 	Assert(FullTransactionIdIsValid(ShmemVariableCache->nextXid));
 
@@ -4424,17 +4429,15 @@ RecordKnownAssignedTransactionIds(TransactionId xid)
 {
 	Assert(standbyState >= STANDBY_INITIALIZED);
 	Assert(TransactionIdIsValid(xid));
-	Assert(TransactionIdIsValid(latestObservedXid));
+	Assert(TransactionIdIsValid(*latestObservedXid));
 
-	elog(trace_recovery(DEBUG4), "record known xact %u latestObservedXid %u",
-		 xid, latestObservedXid);
 
 	/*
 	 * When a newly observed xid arrives, it is frequently the case that it is
 	 * *not* the next xid in sequence. When this occurs, we must treat the
 	 * intervening xids as running also.
 	 */
-	if (TransactionIdFollows(xid, latestObservedXid))
+	if (TransactionIdFollows(xid, *latestObservedXid))
 	{
 		TransactionId next_expected_xid;
 
@@ -4447,7 +4450,7 @@ RecordKnownAssignedTransactionIds(TransactionId xid)
 		 * immediately start assigning subtransactions to their toplevel
 		 * transactions.
 		 */
-		next_expected_xid = latestObservedXid;
+		next_expected_xid = *latestObservedXid;
 		while (TransactionIdPrecedes(next_expected_xid, xid))
 		{
 			TransactionIdAdvance(next_expected_xid);
@@ -4461,25 +4464,25 @@ RecordKnownAssignedTransactionIds(TransactionId xid)
 		 */
 		if (standbyState <= STANDBY_INITIALIZED)
 		{
-			latestObservedXid = xid;
+			*latestObservedXid = xid;
 			return;
 		}
 
 		/*
 		 * Add (latestObservedXid, xid] onto the KnownAssignedXids array.
 		 */
-		next_expected_xid = latestObservedXid;
+		next_expected_xid = *latestObservedXid;
 		TransactionIdAdvance(next_expected_xid);
 		KnownAssignedXidsAdd(next_expected_xid, xid, false);
 
 		/*
 		 * Now we can advance latestObservedXid
 		 */
-		latestObservedXid = xid;
+		*latestObservedXid = xid;
 
 		/* ShmemVariableCache->nextXid must be beyond any observed xid */
-		AdvanceNextFullTransactionIdPastXid(latestObservedXid);
-		next_expected_xid = latestObservedXid;
+		AdvanceNextFullTransactionIdPastXid(*latestObservedXid);
+		next_expected_xid = *latestObservedXid;
 		TransactionIdAdvance(next_expected_xid);
 	}
 }
@@ -4756,10 +4759,12 @@ KnownAssignedXidsAdd(TransactionId from_xid, TransactionId to_xid,
 	 * if the last existing element is marked invalid, it must still have a
 	 * correctly sequenced XID value.
 	 */
+	// KnownAssignedXidsDisplay(LOG);
 	if (head > tail &&
 		TransactionIdFollowsOrEquals(KnownAssignedXids[head - 1], from_xid))
 	{
 		KnownAssignedXidsDisplay(LOG);
+		pg_usleep(100000000L);
 		elog(ERROR, "out-of-order XID insertion in KnownAssignedXids");
 	}
 
@@ -5190,8 +5195,9 @@ KnownAssignedXidsDisplay(int trace_level)
 			appendStringInfo(&buf, "[%d]=%u ", i, KnownAssignedXids[i]);
 		}
 	}
-
-	elog(trace_level, "%d KnownAssignedXids (num=%d tail=%d head=%d) %s",
+ 
+	elog(trace_level, "pid %d, %d KnownAssignedXids (num=%d tail=%d head=%d) %s",
+		MyProcPid,
 		 nxids,
 		 pArray->numKnownAssignedXids,
 		 pArray->tailKnownAssignedXids,

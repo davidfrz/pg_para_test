@@ -79,8 +79,7 @@ StartupProcTriggerHandler(SIGNAL_ARGS)
 	int			save_errno = errno;
 
 	promote_signaled = true;
-	WakeupRecovery(); 
-	ereport(LOG,(errmsg("first")));
+	WakeupRecovery();
 
 	errno = save_errno;
 }
@@ -93,7 +92,6 @@ StartupProcSigHupHandler(SIGNAL_ARGS)
 
 	got_SIGHUP = true;
 	WakeupRecovery();
-	ereport(LOG,(errmsg("second")));
 
 	errno = save_errno;
 }
@@ -109,7 +107,6 @@ StartupProcShutdownHandler(SIGNAL_ARGS)
 	else
 		shutdown_requested = true;
 	WakeupRecovery();
-	ereport(LOG,(errmsg("third")));
 
 	errno = save_errno;
 }

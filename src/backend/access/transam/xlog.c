@@ -7399,7 +7399,7 @@ StartupXLOG(void)
 		 * Koichi:
 		 * We don't like to run XLogBeginRead() with for_parallel_replay == true.
 		 */
-		if (checkPoint.redo < RecPtr) // 检查当前是不是在ck之后，如果在ck之后，说明还要往前倒一倒
+		if (checkPoint.redo < RecPtr)
 		{
 			/* back up to find the record */
 			XLogBeginRead(xlogreader, checkPoint.redo);
@@ -7431,7 +7431,7 @@ StartupXLOG(void)
 			 * main redo apply loop
 			 */
 #ifdef WAL_DEBUG
-			// PRDebug_log("Start redo apply loop.\n{");
+			PRDebug_log("Start redo apply loop.\n{");
 			PR_breakpoint();
 #endif
 			do
@@ -7471,7 +7471,7 @@ StartupXLOG(void)
 					xlog_string = PR_allocBuffer(buf.len+1, true);
 					memcpy(xlog_string, buf.data, buf.len);
 					xlog_string[buf.len] = '\0';
-					// PRDebug_log("=== WAL record parsed === %s\n", xlog_string);
+					PRDebug_log("=== WAL record parsed === %s\n", xlog_string);
 				}
 				if (XLOG_DEBUG ||
 					(rmid == RM_XACT_ID && trace_recovery_messages <= DEBUG2) ||
@@ -7528,6 +7528,7 @@ StartupXLOG(void)
 				}
 
 				/* Setup error traceback support for ereport() */
+				// 并行回放不需要这个
 				// errcallback.callback = rm_redo_error_callback;
 				// errcallback.arg = (void *) xlogreader;
 				// errcallback.previous = error_context_stack;
@@ -7595,16 +7596,15 @@ StartupXLOG(void)
 					 * If we are attempting to enter Hot Standby mode, process
 					 * XIDs we see
 					 */
-				if (!PR_isInParallelRecovery()){
-					if (standbyState >= STANDBY_INITIALIZED &&
+				// if (!PR_isInParallelRecovery())
+				// {
+						if (standbyState >= STANDBY_INITIALIZED &&
 						TransactionIdIsValid(record->xl_xid))
 						RecordKnownAssignedTransactionIds(record->xl_xid);
-				}
-					
+				// }
 
 				if (PR_isInParallelRecovery())
 				{
-					ereport(LOG,(errmsg("****start: parallel first")));
 					/*
 					 * Koichi: TBD
 					 *
@@ -7617,22 +7617,17 @@ StartupXLOG(void)
 					static long	ser_no = -1;
 					char	workername[64];
 #endif
-					// ereport(LOG,(errmsg("fir!!!")));
-					ereport(LOG,(errmsg("----alloc start")));
+
 					xlogreader_PR = (XLogReaderState *)PR_allocBuffer(sizeof(XLogReaderState), true);
-					ereport(LOG,(errmsg("----alloc done")));
 					memcpy(xlogreader_PR, xlogreader, sizeof(XLogReaderState));
-					// ereport(LOG,(errmsg("seccond!!!")));
-					ereport(LOG,(errmsg("cccc DecodedData start")));
 					XLogReaderStateCleanupDecodedData(xlogreader, false);
-					ereport(LOG,(errmsg("cccc DecodedData end")));
 #ifdef WAL_DEBUG
 					xlogreader_PR->ser_no = ++ser_no;
 					xlogreader_PR->xlog_string = xlog_string;
-					ereport(LOG,(errmsg("LLLL LOG START")));
-					// PRDebug_log("Enqueue, ser_no(%ld) to %s, XLOGrecord: \"%s\"\n",
-					// 		ser_no, PR_worker_name(PR_DISPATCHER_WORKER_IDX, workername), xlogreader_PR->xlog_string);
-					// ereport(LOG,(errmsg("third!!!")));
+
+					PRDebug_log("Enqueue, ser_no(%ld) to %s, XLOGrecord: \"%s\"\n",
+							ser_no, PR_worker_name(PR_DISPATCHER_WORKER_IDX, workername), xlogreader_PR->xlog_string);
+
 					if (PR_loop_count >= PR_loop_num)
 					{
 						PR_loop_count = 0;
@@ -7642,42 +7637,9 @@ StartupXLOG(void)
 					}
 					else
 						PR_loop_count++;
-					ereport(LOG,(errmsg("LLLL log done")));
 #endif
-					// ereport(LOG,(errmsg("yaojiale!!!")));
 					PR_enqueue(xlogreader_PR, ReaderState, PR_DISPATCHER_WORKER_IDX);
-					// ereport(LOG,(errmsg("jiaqiqvla!!!")));
 					PR_handled_wal_records_in_the_loop++;
-#ifdef WAL_DEBUG
-					// PRDebug_log("++++++++ at this moment, error_context_stack is at     \n");
-					// PRDebug_log("errcallback content: callback=%lx, arg=%lx, previous=%lx\n", (unsigned long)errcallback.callback, 
-					// 	(unsigned long)errcallback.arg, (unsigned long)errcallback.previous);
-					// const char *get_callback_name(void (*callback)(void *)) 
-					// { 
-					// 	if (callback == rm_redo_error_callback) 
-					// 		return "rm_redo_error_callback"; 
-					// 	// else if (callback == some_other_callback) 
-					// 	// 	return "some_other_callback"; 
-					// 	else 
-					// 		return "some_other_callback"; 
-					// }
-					// PRDebug_log("errcallback callback name: %s\n", get_callback_name(errcallback.callback));
-					// PRDebug_log("Start to print error_context_stack size\n"); 
-					// int size_stack;
-					// size_stack = 0; // 用于存储error_context_stack链表的长度 
-					// ErrorContextCallback *ptr = error_context_stack; // 用于遍历error_context_stack链表 
-					// while (ptr != NULL) // 循环遍历 
-					// { 
-					// 	size_stack++; // 每个结构体加一 
-					// 	ptr = ptr->previous; // 移动到下一个结构体 
-					// } 
-					// PRDebug_log("error_context_stack size: %d\n", size_stack); // 打印长度 
-					// PRDebug_log("End of printing error_context_stack size\n");
-					// PRDebug_log("------------------------\n");
-					// error_context_stack = errcallback.previous;
-
-#endif
-					ereport(LOG,(errmsg("****end: parallel last")));
 				}
 				else
 				{
@@ -7772,7 +7734,7 @@ StartupXLOG(void)
 				PR_syncFinishSockDir();
 				PR_finishMq();
 				xlogreader->for_parallel_replay = false;
-                XLogReaderStateCleanupDecodedData(xlogreader, false);
+				XLogReaderStateCleanupDecodedData(xlogreader, false);
 #ifdef WAL_DEBUG
 				if (PR_test)
 					PRDebug_finish();
@@ -7844,8 +7806,9 @@ StartupXLOG(void)
 				PR_WorkerFinish();
 				PR_finishShm();
 				PR_finishMq();
+				// 释放内存后需要对xlogreader的内存进行恢复，原共享内存已经不再需要
 				xlogreader->for_parallel_replay = false;
-                XLogReaderStateCleanupDecodedData(xlogreader, false);
+				XLogReaderStateCleanupDecodedData(xlogreader, false);
 				/*
 				 * We need to call this here to check all the outstanding WAL
 				 * replay not found in the previous call.
@@ -8539,7 +8502,7 @@ CheckRecoveryConsistency(void)
 		SpinLockRelease(&XLogCtl->info_lck);
 
 		LocalHotStandbyActive = true;
-
+		elog(LOG, "my pid %d", MyProcPid);
 		SendPostmasterSignal(PMSIGNAL_BEGIN_HOT_STANDBY);
 	}
 }

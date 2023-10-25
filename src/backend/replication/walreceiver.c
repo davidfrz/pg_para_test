@@ -664,7 +664,6 @@ WalRcvWaitForStartPosition(XLogRecPtr *startpoint, TimeLineID *startpointTLI)
 	 * now waiting for instructions.
 	 */
 	WakeupRecovery();
-	ereport(LOG,(errmsg("forth")));
 	for (;;)
 	{
 		ResetLatch(MyLatch);
@@ -803,7 +802,6 @@ WalRcvDie(int code, Datum arg)
 
 	/* Wake up the startup process to notice promptly that we're gone */
 	WakeupRecovery();
-	ereport(LOG,(errmsg("fifth")));
 }
 
 /*
@@ -981,8 +979,7 @@ XLogWalRcvFlush(bool dying)
 		SpinLockRelease(&walrcv->mutex);
 
 		/* Signal the startup process and walsender that new WAL has arrived */
-		WakeupRecovery();  // ereport(LOG,(errmsg("database system is ready to accept connections")));
-		ereport(LOG,(errmsg("sixth")));
+		WakeupRecovery();
 		if (AllowCascadeReplication())
 			WalSndWakeup();
 

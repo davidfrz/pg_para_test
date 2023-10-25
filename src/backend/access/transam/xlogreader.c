@@ -1255,7 +1255,7 @@ DecodeXLogRecord(XLogReaderState *state, XLogRecord *record, char **errormsg)
 		 * and should be freed there.
 		 * We just need to cleanup corresponding pointers.
 		 */
-		state->decoded_record = PR_allocBuffer(record->xl_tot_len, true);
+		state->decoded_record = PR_allocBuffer(record->xl_tot_len, true);  //多拷贝一次
 #ifdef WAL_DEBUG
 		appendStringInfo(s, "========== %s() shared buffer allocation ===========\n", __func__);
 		appendStringInfoString(s, "state->decoded_record: ");
@@ -1639,7 +1639,6 @@ XLogRecGetBlockTag(XLogReaderState *record, uint8 block_id,
 void
 XLogReaderStateCleanupDecodedData(XLogReaderState *state, bool should_free)
 {
-	// ereport(LOG,(errmsg("cccc DecodedData start")));
     uint8       block_id;
 
     if (state->for_parallel_replay)
@@ -1665,7 +1664,6 @@ XLogReaderStateCleanupDecodedData(XLogReaderState *state, bool should_free)
         state->main_data = NULL;
         state->main_data_bufsz = state->main_data_len = 0;
     }
-	// ereport(LOG,(errmsg("cccc DecodedData end")));
 }
 
 /*

@@ -330,7 +330,7 @@ AuxiliaryProcessMain(int argc, char *argv[])
 			if (PR_needTestSync())
 			{
 				elog(DEBUG3, "%s: %s: Starting parallel replay debug. Pid = %d.", __func__, __FILE__, getpid());
-				PRDebug_start(0);
+				//PRDebug2_start(0);
 			}
 #endif
 			break;
